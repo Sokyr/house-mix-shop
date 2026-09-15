@@ -1,7 +1,27 @@
 ﻿import { prisma } from "../../../lib/prisma";
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (id) {
+      const product = await prisma.product.findUnique({
+        where: {
+          id: Number(id),
+        },
+      });
+
+      if (!product) {
+        return Response.json(
+          { error: "Товар не знайдено" },
+          { status: 404 }
+        );
+      }
+
+      return Response.json(product);
+    }
+
     const products = await prisma.product.findMany({
       orderBy: {
         createdAt: "desc",

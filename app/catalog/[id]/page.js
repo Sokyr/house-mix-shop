@@ -14,14 +14,16 @@ export default function ProductPage() {
   useEffect(() => {
     if (!params?.id) return;
 
-    fetch("/api/products")
-      .then((res) => res.json())
-      .then((data) => {
-        const found = Array.isArray(data)
-          ? data.find((item) => String(item.id) === String(params.id))
-          : null;
+    fetch(`/api/products?id=${params.id}`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error("Товар не знайдено");
+        }
 
-        setProduct(found || null);
+        return res.json();
+      })
+      .then((data) => {
+        setProduct(data);
         setLoading(false);
       })
       .catch(() => {
