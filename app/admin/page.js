@@ -7,10 +7,14 @@ export default function AdminPage() {
   const router = useRouter();
 
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+
   const [message, setMessage] = useState("");
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -39,9 +43,23 @@ export default function AdminPage() {
     }
   }
 
+  async function loadCategories() {
+    try {
+      const res = await fetch("/api/categories");
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
+        setCategories(data);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   useEffect(() => {
     if (!checkingAuth) {
       loadProducts();
+      loadCategories();
     }
   }, [checkingAuth]);
 
@@ -65,6 +83,7 @@ export default function AdminPage() {
     setPrice(product.price);
     setDescription(product.description || "");
     setImage(product.image || "");
+    setCategoryId(product.categoryId ? String(product.categoryId) : "");
 
     window.scrollTo({
       top: 0,
@@ -78,12 +97,18 @@ export default function AdminPage() {
     setPrice("");
     setDescription("");
     setImage("");
+    setCategoryId("");
     setMessage("");
   }
 
   async function saveProduct(e) {
     e.preventDefault();
     setMessage("");
+
+    if (!categoryId) {
+      setMessage("Оберіть категорію товару");
+      return;
+    }
 
     try {
       const res = await fetch("/api/products", {
@@ -97,6 +122,7 @@ export default function AdminPage() {
           price,
           description,
           image,
+          categoryId: Number(categoryId),
         }),
       });
 
@@ -112,6 +138,7 @@ export default function AdminPage() {
         setPrice("");
         setDescription("");
         setImage("");
+        setCategoryId("");
 
         e.target.reset();
 
@@ -296,6 +323,21 @@ export default function AdminPage() {
             style={inputStyle}
           />
 
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            required
+            style={inputStyle}
+          >
+            <option value="">Оберіть категорію</option>
+
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+
           <label>
             <b>Фото товару</b>
             <br />
@@ -446,6 +488,12 @@ export default function AdminPage() {
                   <p>
                     <b>{product.price} грн</b>
                   </p>
+
+                  {product.category && (
+                    <p>
+                      <b>Категорія:</b> {product.category.name}
+                    </p>
+                  )}
 
                   <p
                     style={{

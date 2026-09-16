@@ -1,0 +1,17 @@
+.mobile-categories {
+  display: none !important;
+}
+
+.desktop-categories {
+  display: flex;
+}
+
+@media (max-width: 700px) {
+  .desktop-categories {
+    display: none !important;
+  }
+
+  .mobile-categories {
+    display: flex !important;
+  }
+}

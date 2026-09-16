@@ -10,6 +10,9 @@ export async function GET(request) {
         where: {
           id: Number(id),
         },
+        include: {
+          category: true,
+        },
       });
 
       if (!product) {
@@ -25,6 +28,9 @@ export async function GET(request) {
     const products = await prisma.product.findMany({
       orderBy: {
         createdAt: "desc",
+      },
+      include: {
+        category: true,
       },
     });
 
@@ -43,12 +49,23 @@ export async function POST(request) {
   try {
     const body = await request.json();
 
+    if (!body.name || !body.price || !body.categoryId) {
+      return Response.json(
+        { error: "Заповніть назву, ціну та категорію" },
+        { status: 400 }
+      );
+    }
+
     const product = await prisma.product.create({
       data: {
         name: body.name,
         price: Number(body.price),
         description: body.description || "",
         image: body.image || "",
+        categoryId: Number(body.categoryId),
+      },
+      include: {
+        category: true,
       },
     });
 
@@ -69,6 +86,13 @@ export async function PATCH(request) {
   try {
     const body = await request.json();
 
+    if (!body.id || !body.name || !body.price || !body.categoryId) {
+      return Response.json(
+        { error: "Заповніть усі обов'язкові поля" },
+        { status: 400 }
+      );
+    }
+
     const product = await prisma.product.update({
       where: {
         id: Number(body.id),
@@ -78,6 +102,10 @@ export async function PATCH(request) {
         price: Number(body.price),
         description: body.description || "",
         image: body.image || "",
+        categoryId: Number(body.categoryId),
+      },
+      include: {
+        category: true,
       },
     });
 
@@ -94,11 +122,18 @@ export async function PATCH(request) {
 
 export async function DELETE(request) {
   try {
-    const { id } = await request.json();
+    const body = await request.json();
+
+    if (!body.id) {
+      return Response.json(
+        { error: "Не вказано товар" },
+        { status: 400 }
+      );
+    }
 
     await prisma.product.delete({
       where: {
-        id: Number(id),
+        id: Number(body.id),
       },
     });
 
