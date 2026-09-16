@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import Header from "../components/Header";
 import "./catalog.css";
 
@@ -12,17 +11,16 @@ export default function CatalogPage() {
   const [activeCategory, setActiveCategory] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const searchParams = useSearchParams();
-
   useEffect(() => {
-    const category = searchParams.get("category");
+    const params = new URLSearchParams(window.location.search);
+    const category = params.get("category");
 
     if (category) {
       setActiveCategory(Number(category));
     } else {
       setActiveCategory(null);
     }
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -87,7 +85,10 @@ export default function CatalogPage() {
               }}
             >
               <button
-                onClick={() => setActiveCategory(null)}
+                onClick={() => {
+                  setActiveCategory(null);
+                  window.history.replaceState({}, "", "/catalog");
+                }}
                 style={{
                   padding: "12px 20px",
                   borderRadius: "25px",
@@ -110,7 +111,14 @@ export default function CatalogPage() {
               {categories.map((category) => (
                 <button
                   key={category.id}
-                  onClick={() => setActiveCategory(category.id)}
+                  onClick={() => {
+                    setActiveCategory(category.id);
+                    window.history.replaceState(
+                      {},
+                      "",
+                      `/catalog?category=${category.id}`
+                    );
+                  }}
                   style={{
                     padding: "12px 20px",
                     borderRadius: "25px",
@@ -281,7 +289,14 @@ export default function CatalogPage() {
           {categories.map((category) => (
             <button
               key={category.id}
-              onClick={() => setActiveCategory(category.id)}
+              onClick={() => {
+                setActiveCategory(category.id);
+                window.history.replaceState(
+                  {},
+                  "",
+                  `/catalog?category=${category.id}`
+                );
+              }}
               style={{
                 flex: 1,
                 maxWidth: "220px",
