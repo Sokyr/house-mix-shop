@@ -1,39 +1,64 @@
 generator client {
-provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-provider = "postgresql"
+  provider = "postgresql"
 }
 
 model Category {
-id Int @id @default(autoincrement())
-name String @unique
-products Product[]
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
 }
 
 model Product {
-id Int @id @default(autoincrement())
-name String
-price Float
-description String @default("")
-image String @default("")
-categoryId Int?
-category Category? @relation(fields: [categoryId], references: [id])
-createdAt DateTime @default(now())
+  id          Int       @id @default(autoincrement())
+  name        String
+  price       Float
+  description String    @default("")
+  image       String    @default("")
+  categoryId  Int?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime  @default(now())
 }
 
 model Order {
-id Int @id @default(autoincrement())
-name String
-phone String
-city String
-address String
-delivery String
-payment String
-total Float
-products String
-status String @default("Нове")
-telegramChatId String?
-createdAt DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  name          String
+  phone         String
+  city          String
+  address       String
+  delivery      String
+  payment       String
+  total         Float
+  products      String
+  status        String   @default("Нове")
+  telegramChatId String?
+  createdAt     DateTime @default(now())
+}
+
+model HomeSettings {
+  id              Int      @id @default(1)
+  heroImage       String   @default("")
+  title           String   @default("House Mix")
+  subtitle        String   @default("Все для затишку вашого дому")
+  buttonText      String   @default("Перейти до каталогу")
+  buttonLink      String   @default("/catalog")
+  showCategories  Boolean  @default(true)
+  showPromotions  Boolean  @default(true)
+  showBestSellers Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+}
+
+model HomeBanner {
+  id          Int      @id @default(autoincrement())
+  title       String   @default("")
+  subtitle    String   @default("")
+  image       String   @default("")
+  buttonText  String   @default("")
+  buttonLink  String   @default("")
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 }

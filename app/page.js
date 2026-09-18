@@ -1,329 +1,850 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import Header from "./components/Header";
 
 export default function HomePage() {
   const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+
+  const [home, setHome] = useState({
+    heroImage: "/house-mix-family.jpg",
+    title: "Готуйте з любов'ю",
+    subtitle:
+      "Якість у кожній деталі. Надійний посуд для вашої кухні",
+    buttonText: "Переглянути колекцію →",
+    buttonLink: "/catalog",
+    showCategories: true,
+    showPromotions: true,
+    showBestSellers: true,
+  });
+
+  const [cartCount, setCartCount] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const lastTouchRef = useRef(0);
+
+  function runHeaderAction(action, event) {
+    if (event?.type === "touchstart") {
+      event.preventDefault();
+      event.stopPropagation();
+      lastTouchRef.current = Date.now();
+      action();
+      return;
+    }
+
+    if (
+      event?.type === "click" &&
+      Date.now() - lastTouchRef.current < 700
+    ) {
+      return;
+    }
+
+    action();
+  }
+
+  function toggleSearch() {
+    setSearchOpen((open) => !open);
+    setMenuOpen(false);
+  }
+
+  function toggleMenu() {
+    setMenuOpen((open) => !open);
+    setSearchOpen(false);
+  }
+
+  function handleButtonKeyDown(event, action) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      action();
+    }
+  }
 
   useEffect(() => {
-    fetch("/api/categories")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setCategories(data);
+    async function loadData() {
+      try {
+        const [homeRes, categoriesRes, productsRes] =
+          await Promise.all([
+            fetch("/api/home"),
+            fetch("/api/categories"),
+            fetch("/api/products"),
+          ]);
+
+        const homeData = await homeRes.json();
+        const categoriesData = await categoriesRes.json();
+        const productsData = await productsRes.json();
+
+        if (homeData?.settings) {
+          setHome({
+            heroImage:
+              homeData.settings.heroImage ||
+              "/house-mix-family.jpg",
+            title:
+              homeData.settings.title ||
+              "Готуйте з любов'ю",
+            subtitle:
+              homeData.settings.subtitle ||
+              "Якість у кожній деталі. Надійний посуд для вашої кухні",
+            buttonText:
+              homeData.settings.buttonText ||
+              "Переглянути колекцію →",
+            buttonLink:
+              homeData.settings.buttonLink ||
+              "/catalog",
+            showCategories:
+              homeData.settings.showCategories !== false,
+            showPromotions:
+              homeData.settings.showPromotions !== false,
+            showBestSellers:
+              homeData.settings.showBestSellers !== false,
+          });
         }
-      })
-      .catch(() => {
-        setCategories([]);
-      });
+
+        if (Array.isArray(categoriesData)) {
+          setCategories(categoriesData);
+        }
+
+        if (Array.isArray(productsData)) {
+          setProducts(productsData);
+        }
+      } catch (error) {
+        console.error("HOME ERROR:", error);
+      }
+    }
+
+    loadData();
   }, []);
 
-  const getIcon = (name) => {
-    if (name === "Посуд") return "♨";
-    if (name === "Організація простору") return "◇";
-    return "•";
-  };
+  useEffect(() => {
+    function updateCart() {
+      try {
+        const cart = JSON.parse(
+          localStorage.getItem("houseMixCart") || "[]"
+        );
+
+        if (Array.isArray(cart)) {
+          setCartCount(
+            cart.reduce(
+              (sum, item) =>
+                sum + Number(item.quantity || 1),
+              0
+            )
+          );
+        }
+      } catch {
+        setCartCount(0);
+      }
+    }
+
+    updateCart();
+
+    window.addEventListener("storage", updateCart);
+
+    return () => {
+      window.removeEventListener("storage", updateCart);
+    };
+  }, []);
+
+  const filteredProducts = useMemo(() => {
+    if (!search.trim()) return products;
+
+    const value = search.toLowerCase();
+
+    return products.filter((product) =>
+      String(product.name || "")
+        .toLowerCase()
+        .includes(value)
+    );
+  }, [products, search]);
+
+  function getCategoryImage(category) {
+    const product = products.find(
+      (item) =>
+        Number(item.categoryId) === Number(category.id) &&
+        item.image
+    );
+
+    return product?.image || "";
+  }
+
+  function categoryTitle(name) {
+    if (name === "Посуд") return "Посуд";
+
+    if (name === "Організація простору") {
+      return "Організація\nпростору";
+    }
+
+    if (name.toLowerCase().includes("суш")) {
+      return "Сушарки\nдля одягу";
+    }
+
+    if (name.toLowerCase().includes("взут")) {
+      return "Полиці\nдля взуття";
+    }
+
+    return name;
+  }
 
   return (
-    <>
-      <style jsx global>{`
-        .home-desktop-categories {
-          display: flex;
-        }
+    <div className="hm-page">
 
-        .home-mobile-categories {
-          display: none;
-        }
+      {/* ================= HEADER ================= */}
 
-        @media (max-width: 700px) {
-          .home-desktop-categories {
-            display: none !important;
-          }
+      <header className="hm-header">
 
-          .home-mobile-categories {
-            display: grid !important;
-          }
-
-          .home-hero {
-            min-height: calc(100vh - 80px) !important;
-          }
-
-          .home-title {
-            font-size: 50px !important;
-          }
-
-          .home-subtitle {
-            font-size: 20px !important;
-          }
-
-          .home-buttons {
-            flex-direction: column !important;
-            width: 100%;
-            max-width: 300px;
-            margin: 0 auto;
-          }
-
-          .home-buttons a {
-            width: 100%;
-          }
-        }
-      `}</style>
-
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#111",
-          color: "white",
-          fontFamily: "Arial, sans-serif",
-          overflow: "hidden",
-        }}
-      >
-        <Header />
-
-        {/* КАТЕГОРІЇ НА ПК */}
-        {categories.length > 0 && (
-          <div
-            className="home-desktop-categories"
-            style={{
-              height: "105px",
-              background: "#101010",
-              borderBottom: "1px solid rgba(255,255,255,0.08)",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "20px",
-              padding: "8px 25px",
-              position: "relative",
-              zIndex: 10,
-            }}
-          >
-            {categories.map((category) => (
-              <Link
-                key={category.id}
-                href={`/catalog?category=${category.id}`}
-                style={{
-                  color: "white",
-                  textDecoration: "none",
-                  width: "280px",
-                  height: "90px",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "7px",
-                  borderRadius: "15px",
-                }}
-              >
-                <div
-                  style={{
-                    width: "50px",
-                    height: "50px",
-                    borderRadius: "50%",
-                    border: "1px solid rgba(255,255,255,0.15)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "26px",
-                    background: "rgba(255,255,255,0.03)",
-                  }}
-                >
-                  {getIcon(category.name)}
-                </div>
-
-                <span
-                  style={{
-                    fontSize: "14px",
-                    textAlign: "center",
-                  }}
-                >
-                  {category.name}
-                </span>
-              </Link>
-            ))}
+        <Link href="/" className="hm-logo">
+          <div>
+            <div className="hm-logo-title">HOUSE MIX</div>
+            <div className="hm-logo-subtitle">
+              ВСЕ ДЛЯ ВАШОГО ДОМУ ♡
+            </div>
           </div>
-        )}
+        </Link>
 
-        {/* ГОЛОВНИЙ БЛОК */}
-        <main
-          className="home-hero"
+        <div
+          className="hm-header-actions"
           style={{
-            minHeight:
-              categories.length > 0
-                ? "calc(100vh - 185px)"
-                : "calc(100vh - 80px)",
             position: "relative",
-            overflow: "hidden",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            zIndex: 99999,
+            pointerEvents: "auto",
           }}
         >
-          <img
-            src="/house-mix-family.jpg"
-            alt="House Mix"
+
+
+        
+          {/* ПОШУК */}
+<button
+  type="button"
+  className="hm-header-button"
+  onTouchStart={(e) => runHeaderAction(toggleSearch, e)}
+  onClick={(e) => runHeaderAction(toggleSearch, e)}
+  aria-label="Пошук"
+>
+  <span className="hm-search-icon" />
+</button>
+          {/* КОШИК */}
+
+          <Link
+            href="/cart"
+            className="hm-header-button"
+            aria-label="Кошик"
+          >
+            <span className="hm-cart-icon">
+              🛒
+            </span>
+
+            {cartCount > 0 && (
+              <span className="hm-cart-count">
+                {cartCount}
+              </span>
+            )}
+          </Link>
+
+          {/* МЕНЮ */}
+
+         <button
+  type="button"
+  className="hm-header-button"
+  onTouchStart={(e) => runHeaderAction(toggleMenu, e)}
+  onClick={(e) => runHeaderAction(toggleMenu, e)}
+  aria-label="Меню"
+>
+  <span className="hm-menu-icon">
+    <span />
+    <span />
+    <span />
+  </span>
+</button>
+        </div>
+        {/* ПОШУК */}
+
+        {searchOpen && (
+          <div
+            className="hm-search-box"
             style={{
               position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              filter: "blur(5px)",
-              transform: "scale(1.05)",
-            }}
-          />
-
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.62))",
-            }}
-          />
-
-          <section
-            style={{
-              position: "relative",
-              zIndex: 2,
-              width: "100%",
-              textAlign: "center",
-              color: "white",
-              padding: "40px 20px",
+              zIndex: 99999,
+              pointerEvents: "auto",
             }}
           >
-            <h1
-              className="home-title"
-              style={{
-                fontSize: "clamp(55px, 7vw, 90px)",
-                margin: 0,
-                fontWeight: "800",
-                letterSpacing: "-2px",
-              }}
-            >
-              House Mix
-            </h1>
-
-            <p
-              className="home-subtitle"
-              style={{
-                fontSize: "clamp(21px, 3vw, 30px)",
-                marginTop: "15px",
-                marginBottom: "35px",
-              }}
-            >
-              Все для затишку вашого дому
-            </p>
-
-            <div
-              className="home-buttons"
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: "12px",
-                flexWrap: "wrap",
-              }}
-            >
-              <Link
-                href="/catalog"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "15px 30px",
-                  background: "white",
-                  color: "#111",
-                  borderRadius: "30px",
-                  textDecoration: "none",
-                  fontSize: "17px",
-                  fontWeight: "700",
-                }}
-              >
-                Перейти до каталогу
-              </Link>
-
-              <Link
-                href="/order-status"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "15px 30px",
-                  background: "rgba(0,0,0,0.3)",
-                  color: "white",
-                  border: "1px solid rgba(255,255,255,0.7)",
-                  borderRadius: "30px",
-                  textDecoration: "none",
-                  fontSize: "17px",
-                  fontWeight: "700",
-                }}
-              >
-                📦 Статус замовлення
-              </Link>
-            </div>
-          </section>
-        </main>
-
-        {/* КАТЕГОРІЇ НА ТЕЛЕФОНІ */}
-        {categories.length > 0 && (
-          <div
-            className="home-mobile-categories"
-            style={{
-              position: "fixed",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 50,
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: "8px",
-              background: "#101010",
-              borderTop: "1px solid rgba(255,255,255,0.1)",
-              padding: "10px",
-            }}
-          >
-            {categories.map((category) => (
-              <Link
-                key={category.id}
-                href={`/catalog?category=${category.id}`}
-                style={{
-                  color: "white",
-                  textDecoration: "none",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "5px",
-                  minHeight: "75px",
-                }}
-              >
-                <div
-                  style={{
-                    width: "45px",
-                    height: "45px",
-                    borderRadius: "50%",
-                    border: "1px solid rgba(255,255,255,0.15)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "24px",
-                  }}
-                >
-                  {getIcon(category.name)}
-                </div>
-
-                <span
-                  style={{
-                    fontSize: "13px",
-                    textAlign: "center",
-                  }}
-                >
-                  {category.name}
-                </span>
-              </Link>
-            ))}
+            <input
+              autoFocus
+              className="hm-search-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Пошук товару..."
+            />
           </div>
         )}
-      </div>
-    </>
+
+        {/* МЕНЮ */}
+
+        {menuOpen && (
+          <div
+            className="hm-menu"
+            style={{
+              position: "absolute",
+              zIndex: 99999,
+              pointerEvents: "auto",
+            }}
+          >
+
+            <Link
+              href="/"
+              className="hm-menu-link"
+              onClick={() => setMenuOpen(false)}
+            >
+              🏠 <span>Головна</span>
+            </Link>
+
+            <Link
+              href="/catalog"
+              className="hm-menu-link"
+              onClick={() => setMenuOpen(false)}
+            >
+              ▦ <span>Каталог</span>
+            </Link>
+
+            <Link
+              href="/cart"
+              className="hm-menu-link"
+              onClick={() => setMenuOpen(false)}
+            >
+              🛒 <span>Кошик</span>
+            </Link>
+
+            <Link
+              href="/catalog"
+              className="hm-menu-link"
+              onClick={() => setMenuOpen(false)}
+            >
+              ♡ <span>Акції</span>
+            </Link>
+
+            <Link
+              href="/order-status"
+              className="hm-menu-link"
+              onClick={() => setMenuOpen(false)}
+            >
+              📋 <span>Мої замовлення</span>
+            </Link>
+
+            <Link
+              href="/"
+              className="hm-menu-link"
+              onClick={() => setMenuOpen(false)}
+            >
+              ☎ <span>Контакти</span>
+            </Link>
+
+            <Link
+              href="/"
+              className="hm-menu-link"
+              onClick={() => setMenuOpen(false)}
+            >
+              ⓘ <span>Про нас</span>
+            </Link>
+
+          </div>
+        )}
+
+      </header>
+
+      {/* ================= SEARCH RESULTS ================= */}
+
+      {search.trim() ? (
+        <section
+          style={{
+            background: "#fff",
+            padding: "30px 0",
+          }}
+        >
+
+          <div className="hm-container">
+
+            <div className="hm-section-header">
+
+              <h2 className="hm-section-title">
+                Результати пошуку
+              </h2>
+
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                style={{
+                  border: 0,
+                  background: "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                Очистити
+              </button>
+
+            </div>
+
+            {filteredProducts.length > 0 ? (
+              <div className="hm-products">
+
+                {filteredProducts
+                  .slice(0, 8)
+                  .map((product) => (
+                    <Link
+                      key={product.id}
+                      href={`/catalog/${product.id}`}
+                      className="hm-product"
+                    >
+
+                      {product.image && (
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="hm-product-image"
+                        />
+                      )}
+
+                      <div className="hm-product-info">
+
+                        <h3 className="hm-product-name">
+                          {product.name}
+                        </h3>
+
+                        <div className="hm-product-price">
+                          {product.price} грн
+                        </div>
+
+                      </div>
+
+                    </Link>
+                  ))}
+
+              </div>
+            ) : (
+              <p>Товарів не знайдено.</p>
+            )}
+
+          </div>
+
+        </section>
+      ) : (
+        <>
+
+          {/* ================= HERO ================= */}
+
+          <section className="hm-hero">
+
+            <img
+              src={
+                home.heroImage ||
+                "/house-mix-family.jpg"
+              }
+              alt="House Mix"
+              className="hm-hero-image"
+            />
+
+            <div className="hm-hero-overlay" />
+
+            <div className="hm-hero-content">
+
+              <div className="hm-container">
+
+                <div className="hm-hero-text">
+
+                  <div className="hm-hero-small">
+                    HOUSE MIX • ПОСУД • ДЛЯ ДОМУ • ЗАТИШОК
+                  </div>
+
+                  <h1 className="hm-hero-title">
+                    {home.title}
+                  </h1>
+
+                  <p className="hm-hero-description">
+                    {home.subtitle}
+                  </p>
+
+                  <Link
+                    href={
+                      home.buttonLink ||
+                      "/catalog"
+                    }
+                    className="hm-hero-button"
+                  >
+                    {home.buttonText ||
+                      "Переглянути колекцію →"}
+                  </Link>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <div className="hm-slider-dots">
+              <span className="hm-slider-dot active" />
+              <span className="hm-slider-dot" />
+              <span className="hm-slider-dot" />
+            </div>
+
+          </section>
+
+          {/* ================= BENEFITS ================= */}
+
+          <section className="hm-benefits">
+
+            <div className="hm-container">
+
+              <div className="hm-benefits-grid">
+
+                <div className="hm-benefit">
+
+                  <div className="hm-benefit-icon">
+                    🚚
+                  </div>
+
+                  <div>
+
+                    <div className="hm-benefit-title">
+                      Швидка доставка
+                    </div>
+
+                    <div className="hm-benefit-text">
+                      по Україні
+                    </div>
+
+                  </div>
+
+                </div>
+
+                <div className="hm-benefit">
+
+                  <div className="hm-benefit-icon">
+                    🛡️
+                  </div>
+
+                  <div>
+
+                    <div className="hm-benefit-title">
+                      Гарантія
+                    </div>
+
+                    <div className="hm-benefit-text">
+                      якості
+                    </div>
+
+                  </div>
+
+                </div>
+
+                <div className="hm-benefit">
+
+                  <div className="hm-benefit-icon">
+                    💳
+                  </div>
+
+                  <div>
+
+                    <div className="hm-benefit-title">
+                      Зручна
+                    </div>
+
+                    <div className="hm-benefit-text">
+                      оплата
+                    </div>
+
+                  </div>
+
+                </div>
+
+                <div className="hm-benefit">
+
+                  <div className="hm-benefit-icon">
+                    🎁
+                  </div>
+
+                  <div>
+
+                    <div className="hm-benefit-title">
+                      Акції
+                    </div>
+
+                    <div className="hm-benefit-text">
+                      та подарунки
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </section>
+
+          {/* ================= CATEGORIES ================= */}
+
+          {home.showCategories &&
+            categories.length > 0 && (
+              <section className="hm-section">
+
+                <div className="hm-container">
+
+                  <div className="hm-section-header">
+
+                    <h2 className="hm-section-title">
+                      Популярні категорії
+                    </h2>
+
+                    <Link
+                      href="/catalog"
+                      className="hm-section-link"
+                    >
+                      Всі категорії →
+                    </Link>
+
+                  </div>
+
+                  <div className="hm-categories">
+
+                    {categories
+                      .slice(0, 4)
+                      .map((category) => {
+
+                        const image =
+                          getCategoryImage(category);
+
+                        return (
+                          <Link
+                            key={category.id}
+                            href={`/catalog?category=${category.id}`}
+                            className="hm-category"
+                          >
+
+                            {image ? (
+                              <img
+                                src={image}
+                                alt={category.name}
+                                className="hm-category-image"
+                              />
+                            ) : (
+                              <div className="hm-category-empty">
+                                🏠
+                              </div>
+                            )}
+
+                            <div className="hm-category-name">
+                              {categoryTitle(
+                                category.name
+                              )}
+                            </div>
+
+                          </Link>
+                        );
+                      })}
+
+                  </div>
+
+                </div>
+
+              </section>
+            )}
+
+          {/* ================= PROMOTION ================= */}
+
+          {home.showPromotions && (
+            <section className="hm-promo">
+
+              <img
+                src={
+                  home.heroImage ||
+                  "/house-mix-family.jpg"
+                }
+                alt="Акції"
+                className="hm-promo-image"
+              />
+
+              <div className="hm-promo-content">
+
+                <div className="hm-container">
+
+                  <h2 className="hm-promo-title">
+                    Вигідні
+                    <br />
+                    акції
+                  </h2>
+
+                  <p className="hm-promo-text">
+                    Слідкуй за знижками
+                    <br />
+                    та спеціальними пропозиціями!
+                  </p>
+
+                  <Link
+                    href="/catalog"
+                    className="hm-promo-button"
+                  >
+                    Переглянути акції →
+                  </Link>
+
+                </div>
+
+              </div>
+
+            </section>
+          )}
+
+          {/* ================= BEST SELLERS ================= */}
+
+          {home.showBestSellers &&
+            products.length > 0 && (
+              <section className="hm-section">
+
+                <div className="hm-container">
+
+                  <div className="hm-section-header">
+
+                    <h2 className="hm-section-title">
+                      Хіти продажів
+                    </h2>
+
+                    <Link
+                      href="/catalog"
+                      className="hm-section-link"
+                    >
+                      Дивитись всі →
+                    </Link>
+
+                  </div>
+
+                  <div className="hm-products">
+
+                    {products
+                      .slice(0, 8)
+                      .map((product) => (
+                        <Link
+                          key={product.id}
+                          href={`/catalog/${product.id}`}
+                          className="hm-product"
+                        >
+
+                          <div className="hm-hit">
+                            Хіт
+                          </div>
+
+                          <div className="hm-heart">
+                            ♡
+                          </div>
+
+                          {product.image ? (
+                            <img
+                              src={product.image}
+                              alt={product.name}
+                              className="hm-product-image"
+                            />
+                          ) : (
+                            <div className="hm-product-image" />
+                          )}
+
+                          <div className="hm-product-info">
+
+                            <h3 className="hm-product-name">
+                              {product.name}
+                            </h3>
+
+                            <div className="hm-product-price">
+                              {product.price} грн
+                            </div>
+
+                          </div>
+
+                        </Link>
+                      ))}
+
+                  </div>
+
+                </div>
+
+              </section>
+            )}
+
+          {/* ================= FOOTER ================= */}
+
+          <footer className="hm-footer">
+
+            <div className="hm-container">
+
+              <div className="hm-footer-grid">
+
+                <div>
+
+                  <h3>HOUSE MIX</h3>
+
+                  <p>
+                    Все для вашого дому.
+                    <br />
+                    Товари для затишку,
+                    організації та кухні.
+                  </p>
+
+                </div>
+
+                <div>
+
+                  <h3>Магазин</h3>
+
+                  <Link
+                    href="/catalog"
+                    className="hm-footer-link"
+                  >
+                    Каталог
+                  </Link>
+
+                  <Link
+                    href="/cart"
+                    className="hm-footer-link"
+                  >
+                    Кошик
+                  </Link>
+
+                  <Link
+                    href="/order-status"
+                    className="hm-footer-link"
+                  >
+                    Моє замовлення
+                  </Link>
+
+                </div>
+
+                <div>
+
+                  <h3>Інформація</h3>
+
+                  <Link
+                    href="/"
+                    className="hm-footer-link"
+                  >
+                    Про нас
+                  </Link>
+
+                  <Link
+                    href="/"
+                    className="hm-footer-link"
+                  >
+                    Контакти
+                  </Link>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </footer>
+
+        </>
+      )}
+
+    </div>
   );
 }
