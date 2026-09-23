@@ -52,25 +52,6 @@ const home = searchParams.get("home") === "1";
 const search = searchParams.get("search")?.trim() || "";
 const bestSellers = searchParams.get("bestSellers") === "1";
 const category = searchParams.get("category");
-    const pageParam = searchParams.get("page");
-    const limitParam = searchParams.get("limit");
-    const page = Math.max(Number(searchParams.get("page")) || 1, 1);
-    const requestedLimit = Number(searchParams.get("limit"));
-
-    const hasPagination =
-      Number.isFinite(requestedLimit) &&
-      requestedLimit > 0 &&
-      !home &&
-      !search &&
-      !id;
-
-    const limit = hasPagination
-      ? Math.min(Math.floor(requestedLimit), 100)
-      : 20;
-
-    const skip = hasPagination
-      ? (page - 1) * limit
-      : 0;
     if (id) {
       const product = await prisma.product.findUnique({
         where: {
@@ -121,25 +102,6 @@ const category = searchParams.get("category");
 
   ...(home && !bestSellers && !category && !search
     ? { take: 12 }
-    : {}),
-
-  ...(pageParam
-    ? {
-        skip:
-          (Math.max(Number(pageParam) || 1, 1) - 1) *
-          Math.min(Math.max(Number(limitParam) || 20, 1), 100),
-        take: Math.min(
-          Math.max(Number(limitParam) || 20, 1),
-          100
-        ),
-      }
-    : {}),
-
-  ...(hasPagination
-    ? {
-        skip,
-        take: limit,
-      }
     : {}),
 
   select: {

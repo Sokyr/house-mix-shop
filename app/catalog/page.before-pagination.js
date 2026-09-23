@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -10,13 +10,11 @@ export default function CatalogPage() {
   const [categories, setCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const category = params.get("category");
+const bestSellers = params.get("bestSellers") === "1";
 
     if (category) {
       setActiveCategory(Number(category));
@@ -25,63 +23,30 @@ export default function CatalogPage() {
     }
   }, []);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const bestSellers = params.get("bestSellers") === "1";
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const bestSellers = params.get("bestSellers") === "1";
 
-    Promise.all([
-      fetch(
-        bestSellers
-          ? "/api/products?bestSellers=1&page=1&limit=20"
-          : "/api/products?page=1&limit=20"
-      ).then((res) => res.json()),
+  Promise.all([
+    fetch(
+      bestSellers
+        ? "/api/products?bestSellers=1"
+        : "/api/products"
+    ).then((res) => res.json()),
 
-      fetch("/api/categories").then((res) => res.json()),
-    ])
-      .then(([productsData, categoriesData]) => {
-        const list = Array.isArray(productsData) ? productsData : [];
-
-        setProducts(list);
-        setCategories(Array.isArray(categoriesData) ? categoriesData : []);
-        setPage(1);
-        setHasMore(list.length === 20);
-        setLoading(false);
-      })
-      .catch(() => {
-        setProducts([]);
-        setCategories([]);
-        setHasMore(false);
-        setLoading(false);
-      });
-  }, []);
-
-  const loadMoreProducts = async () => {
-    if (loadingMore || !hasMore) return;
-
-    const nextPage = page + 1;
-    const params = new URLSearchParams(window.location.search);
-    const bestSellers = params.get("bestSellers") === "1";
-
-    setLoadingMore(true);
-
-    try {
-      const url = bestSellers
-        ? `/api/products?bestSellers=1&page=${nextPage}&limit=20`
-        : `/api/products?page=${nextPage}&limit=20`;
-
-      const res = await fetch(url);
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : [];
-
-      setProducts((prev) => [...prev, ...list]);
-      setPage(nextPage);
-      setHasMore(list.length === 20);
-    } catch {
-      setHasMore(false);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+    fetch("/api/categories").then((res) => res.json()),
+  ])
+    .then(([productsData, categoriesData]) => {
+      setProducts(Array.isArray(productsData) ? productsData : []);
+      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      setLoading(false);
+    })
+    .catch(() => {
+      setProducts([]);
+      setCategories([]);
+      setLoading(false);
+    });
+}, []);
 
   const filteredProducts =
     activeCategory === null
@@ -189,13 +154,63 @@ export default function CatalogPage() {
             </div>
           )}
 
-          {!loading && filteredProducts.length > 0 && (
+          {loading ? (
+            <div
+              style={{
+                background: "white",
+                padding: "40px",
+                borderRadius: "16px",
+                textAlign: "center",
+              }}
+            >
+              <h2>Завантаження товарів...</h2>
+            </div>
+          ) : products.length === 0 ? (
+            <div
+              style={{
+                background: "white",
+                padding: "40px",
+                borderRadius: "16px",
+                textAlign: "center",
+              }}
+            >
+              <h2>Товарів поки немає</h2>
+
+              <p>Додай перший товар через адмін-панель.</p>
+
+              <Link
+                href="/admin"
+                style={{
+                  display: "inline-block",
+                  marginTop: "15px",
+                  padding: "12px 24px",
+                  background: "#111",
+                  color: "white",
+                  borderRadius: "8px",
+                  textDecoration: "none",
+                }}
+              >
+                Відкрити адмін-панель
+              </Link>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div
+              style={{
+                background: "white",
+                padding: "40px",
+                borderRadius: "16px",
+                textAlign: "center",
+              }}
+            >
+              <h2>У цій категорії поки немає товарів</h2>
+            </div>
+          ) : (
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns:
-                  "repeat(auto-fill, minmax(220px, 1fr))",
-                gap: "20px",
+                  "repeat(auto-fill, minmax(240px, 1fr))",
+                gap: "25px",
               }}
             >
               {filteredProducts.map((product) => (
@@ -203,25 +218,26 @@ export default function CatalogPage() {
                   key={product.id}
                   href={`/catalog/${product.id}`}
                   style={{
-                    textDecoration: "none",
-                    color: "#111",
                     background: "white",
                     borderRadius: "16px",
                     overflow: "hidden",
-                    boxShadow: "0 4px 15px rgba(0,0,0,.08)",
+                    boxShadow: "0 4px 15px rgba(0,0,0,0.08)",
+                    textDecoration: "none",
+                    color: "#111",
+                    display: "block",
                   }}
                 >
                   <div
                     style={{
-                      width: "100%",
-                      aspectRatio: "1 / 1",
-                      background: "#fafafa",
+                      height: "260px",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
+                      background: "#fafafa",
+                      padding: "15px",
                     }}
                   >
-                    {product.image && (
+                    {product.image ? (
                       <img
                         src={product.image}
                         alt={product.name}
@@ -231,15 +247,16 @@ export default function CatalogPage() {
                           objectFit: "contain",
                         }}
                       />
+                    ) : (
+                      <span>Фото відсутнє</span>
                     )}
                   </div>
 
-                  <div style={{ padding: "16px" }}>
+                  <div style={{ padding: "18px" }}>
                     <h2
                       style={{
-                        fontSize: "17px",
+                        fontSize: "20px",
                         margin: "0 0 10px",
-                        color: "#111",
                       }}
                     >
                       {product.name}
@@ -247,8 +264,8 @@ export default function CatalogPage() {
 
                     <strong
                       style={{
-                        fontSize: "20px",
-                        color: "#111",
+                        display: "block",
+                        fontSize: "22px",
                       }}
                     >
                       {product.price} грн
@@ -258,47 +275,60 @@ export default function CatalogPage() {
               ))}
             </div>
           )}
-
-          {loading && (
-            <div style={{ padding: "40px 0", textAlign: "center" }}>
-              Завантаження...
-            </div>
-          )}
-
-          {!loading && filteredProducts.length === 0 && (
-            <div style={{ padding: "40px 0", textAlign: "center" }}>
-              Товарів не знайдено
-            </div>
-          )}
-
-          {!loading && hasMore && products.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                margin: "35px 0 20px",
-              }}
-            >
-              <button
-                onClick={loadMoreProducts}
-                disabled={loadingMore}
-                style={{
-                  padding: "14px 30px",
-                  borderRadius: "12px",
-                  border: "2px solid #fff",
-                  background: "#211710",
-                  color: "#fff",
-                  fontSize: "16px",
-                  fontWeight: "700",
-                  cursor: loadingMore ? "wait" : "pointer",
-                }}
-              >
-                {loadingMore ? "Завантаження..." : "Показати ще"}
-              </button>
-            </div>
-          )}
         </section>
       </main>
+
+      {!loading && categories.length > 0 && (
+        <div
+          className="mobile-categories"
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 50,
+            background: "white",
+            borderTop: "1px solid #ddd",
+            padding: "10px",
+            display: "flex",
+            gap: "8px",
+            justifyContent: "center",
+          }}
+        >
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              onClick={() => {
+                setActiveCategory(category.id);
+                window.history.replaceState(
+                  {},
+                  "",
+                  `/catalog?category=${category.id}`
+                );
+              }}
+              style={{
+                flex: 1,
+                maxWidth: "220px",
+                padding: "11px 8px",
+                borderRadius: "12px",
+                border: "none",
+                background:
+                  Number(activeCategory) === Number(category.id)
+                    ? "#111"
+                    : "#f1f1f1",
+                color:
+                  Number(activeCategory) === Number(category.id)
+                    ? "white"
+                    : "#111",
+                fontWeight: "600",
+                cursor: "pointer",
+              }}
+            >
+              {category.name}
+            </button>
+          ))}
+        </div>
+      )}
     </>
   );
 }

@@ -607,7 +607,7 @@ onClick={toggleMenu}
       <div className="hm-hero-content">
         <div className="hm-container">
         <div
-  className="hm-hero-text"
+  className="hm-hero-text hm-history-text"
   style={{ transform: "translateY(-30px)" }}
 >
 
@@ -1060,4 +1060,5 @@ onClick={() =>
     </div>
   );
 }
+
 
