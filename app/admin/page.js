@@ -18,6 +18,7 @@ export default function AdminPage() {
   const [description, setDescription] = useState("");
   const [image, setImage] = useState("");
   const [categoryId, setCategoryId] = useState("");
+const [isBestSeller, setIsBestSeller] = useState(false);
 
   // =========================
   // ГОЛОВНА СТОРІНКА
@@ -39,7 +40,21 @@ export default function AdminPage() {
   const [showCategories, setShowCategories] = useState(true);
   const [showPromotions, setShowPromotions] = useState(true);
   const [showBestSellers, setShowBestSellers] = useState(true);
-
+const [promotions, setPromotions] = useState([]);
+const [newCategoryName, setNewCategoryName] = useState("");
+const [newCategoryImage, setNewCategoryImage] = useState("");
+const [categoryMessage, setCategoryMessage] = useState("");
+const [promotionTitle, setPromotionTitle] = useState("");
+const [promotionSubtitle, setPromotionSubtitle] = useState("");
+const [promotionImage, setPromotionImage] = useState("");
+const [promotionButtonText, setPromotionButtonText] = useState("Переглянути →");
+const [promotionButtonLink, setPromotionButtonLink] = useState("/catalog");
+const [promotionSortOrder, setPromotionSortOrder] = useState(0);
+const [promotionActive, setPromotionActive] = useState(true);
+const [promotionProductIds, setPromotionProductIds] = useState([]);
+const [promotionPrice, setPromotionPrice] = useState("");
+const [editingPromotionId, setEditingPromotionId] = useState(null);
+const [promotionMessage, setPromotionMessage] = useState("");
   // =========================
   // СТАН
   // =========================
@@ -94,13 +109,63 @@ export default function AdminPage() {
       console.error(error);
     }
   }
+async function addCategory() {
+  const name = newCategoryName.trim();
 
-  // =========================
-  // ГОЛОВНА
-  // =========================
+  if (!name) {
+    setCategoryMessage("Введи назву категорії");
+    return;
+  }
 
-  async function loadHomeSettings() {
-    try {
+  try {
+    const res = await fetch("/api/categories", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+  name,
+  image: newCategoryImage,
+}),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Не вдалося додати категорію");
+    }
+
+    setNewCategoryName("");
+    setCategoryMessage("Категорію додано ✅");
+    loadCategories();
+  } catch (error) {
+    setCategoryMessage(error.message);
+  }
+}
+
+async function deleteCategory(id) {
+  if (!confirm("Видалити цю категорію?")) return;
+
+  try {
+    const res = await fetch(`/api/categories?id=${id}`, {
+      method: "DELETE",
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Не вдалося видалити категорію");
+    }
+
+    setCategoryMessage("Категорію видалено ✅");
+    loadCategories();
+  } catch (error) {
+    setCategoryMessage(error.message);
+  }
+}
+  // =========================
+async function loadHomeSettings() {
+     try {
       setHomeLoading(true);
 
       const res = await fetch("/api/home");
@@ -142,7 +207,20 @@ export default function AdminPage() {
     } finally {
       setHomeLoading(false);
     }
+  } 
+  async function loadPromotions() {
+  try {
+    const res = await fetch("/api/promotions");
+    const data = await res.json();
+
+    if (Array.isArray(data)) {
+      setPromotions(data);
+    }
+  } catch (error) {
+    console.error("PROMOTIONS LOAD ERROR:", error);
   }
+}
+
 
   async function saveHomeSettings(e) {
     e.preventDefault();
@@ -216,9 +294,150 @@ export default function AdminPage() {
       loadProducts();
       loadCategories();
       loadHomeSettings();
+loadPromotions();
     }
   }, [checkingAuth]);
+// =========================
+// АКЦІЇ
+// =========================
 
+function resetPromotionForm() {
+  setPromotionTitle("");
+  setPromotionSubtitle("");
+  setPromotionImage("");
+  setPromotionButtonText("Переглянути →");
+  setPromotionButtonLink("/catalog");
+  setPromotionSortOrder(0);
+  setPromotionActive(true);
+setPromotionProductIds([]);
+setPromotionPrice("");
+  setEditingPromotionId(null);
+  setPromotionMessage("");
+}
+
+function handlePromotionImage(e) {
+  const file = e.target.files?.[0];
+
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    setPromotionMessage("❌ Оберіть файл зображення");
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    setPromotionImage(reader.result);
+    setPromotionMessage("");
+  };
+
+  reader.onerror = () => {
+    setPromotionMessage("❌ Не вдалося прочитати зображення");
+  };
+
+  reader.readAsDataURL(file);
+}
+
+function startEditPromotion(promotion) {
+  setEditingPromotionId(promotion.id);
+  setPromotionTitle(promotion.title || "");
+  setPromotionSubtitle(promotion.subtitle || "");
+  setPromotionImage(promotion.image || "");
+  setPromotionButtonText(
+    promotion.buttonText || "Переглянути →"
+  );
+  setPromotionButtonLink(
+    promotion.buttonLink || "/catalog"
+  );
+  setPromotionSortOrder(promotion.sortOrder || 0);
+  setPromotionActive(promotion.isActive !== false);
+setPromotionProductIds(
+  Array.isArray(promotion.productIds)
+    ? promotion.productIds
+    : JSON.parse(promotion.productIds || "[]")
+);
+setPromotionPrice(promotion.promoPrice || "");
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
+}
+
+async function savePromotion(e) {
+  e.preventDefault();
+  setPromotionMessage("");
+
+  try {
+    const res = await fetch("/api/promotions", {
+      method: editingPromotionId ? "PATCH" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id: editingPromotionId,
+        title: promotionTitle,
+        subtitle: promotionSubtitle,
+        image: promotionImage,
+        buttonText: promotionButtonText,
+        buttonLink: promotionButtonLink,
+        sortOrder: Number(promotionSortOrder) || 0,
+        isActive: promotionActive,
+        productIds: promotionProductIds,
+        promoPrice: Number(promotionPrice) || 0,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Помилка збереження");
+    }
+
+    setPromotionMessage(
+      editingPromotionId
+        ? "✅ Акцію успішно змінено!"
+        : "✅ Акцію успішно додано!"
+    );
+
+    resetPromotionForm();
+    await loadPromotions();
+  } catch (error) {
+    console.error("PROMOTION SAVE ERROR:", error);
+    setPromotionMessage(
+      "❌ Не вдалося зберегти акцію"
+    );
+  }
+}
+
+async function deletePromotion(id) {
+  const confirmed = confirm(
+    "Точно видалити цю акцію?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(
+      `/api/promotions?id=${id}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    if (!res.ok) {
+      throw new Error("Помилка видалення");
+    }
+
+    setPromotionMessage("✅ Акцію видалено!");
+    await loadPromotions();
+  } catch (error) {
+    console.error("PROMOTION DELETE ERROR:", error);
+    setPromotionMessage(
+      "❌ Не вдалося видалити акцію"
+    );
+  }
+}
   // =========================
   // РЕДАГУВАННЯ ТОВАРУ
   // =========================
@@ -289,6 +508,7 @@ export default function AdminPage() {
           description,
           image,
           categoryId: Number(categoryId),
+isBestSeller,
         }),
       });
 
@@ -305,6 +525,7 @@ export default function AdminPage() {
         setDescription("");
         setImage("");
         setCategoryId("");
+setIsBestSeller(false);
 
         e.target.reset();
 
@@ -771,7 +992,364 @@ export default function AdminPage() {
             </form>
           )}
         </section>
+{/* ========================= */}
+{/* АКЦІЇ */}
+{/* ========================= */}
 
+<section
+  style={{
+    marginTop: "30px",
+    background: "white",
+    padding: "25px",
+    borderRadius: "16px",
+    boxShadow: "0 4px 15px rgba(0,0,0,0.06)",
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: "15px",
+      flexWrap: "wrap",
+      marginBottom: "20px",
+    }}
+  >
+    <div>
+      <h2
+        style={{
+          margin: 0,
+          fontSize: "26px",
+        }}
+      >
+        Акції
+      </h2>
+
+      <p
+        style={{
+          margin: "6px 0 0",
+          color: "#777",
+        }}
+      >
+        Додавайте та редагуйте акції магазину
+      </p>
+    </div>
+
+    {editingPromotionId && (
+      <button
+        type="button"
+        onClick={resetPromotionForm}
+        style={{
+          padding: "10px 16px",
+          borderRadius: "10px",
+          border: "1px solid #ddd",
+          background: "#fff",
+          cursor: "pointer",
+          fontWeight: 700,
+        }}
+      >
+        Скасувати редагування
+      </button>
+    )}
+  </div>
+
+  <form onSubmit={savePromotion}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+        gap: "15px",
+      }}
+    >
+      <div>
+        <label>Назва акції</label>
+        <input
+          value={promotionTitle}
+          onChange={(e) => setPromotionTitle(e.target.value)}
+          placeholder="Наприклад: 2+1 для випічки"
+          style={inputStyle}
+        />
+      </div>
+
+      <div>
+        <label>Короткий опис</label>
+        <input
+          value={promotionSubtitle}
+          onChange={(e) => setPromotionSubtitle(e.target.value)}
+          placeholder="Коротко про пропозицію"
+          style={inputStyle}
+        />
+      </div>
+
+      <div>
+        <label>Текст кнопки</label>
+        <input
+          value={promotionButtonText}
+          onChange={(e) => setPromotionButtonText(e.target.value)}
+          placeholder="Переглянути →"
+          style={inputStyle}
+        />
+      </div>
+
+      <div>
+        <label>Посилання кнопки</label>
+        <input
+          value={promotionButtonLink}
+          onChange={(e) => setPromotionButtonLink(e.target.value)}
+          placeholder="/catalog"
+          style={inputStyle}
+        />
+      </div>
+
+      <div>
+        <label>Порядок</label>
+        <input
+          type="number"
+          value={promotionSortOrder}
+          onChange={(e) => setPromotionSortOrder(e.target.value)}
+          style={inputStyle}
+        />
+      </div>
+      <div>
+        <label>Ціна акції</label>
+        <input
+          type="number"
+          value={promotionPrice}
+          onChange={(e) => setPromotionPrice(e.target.value)}
+          placeholder="Наприклад: 250"
+          style={inputStyle}
+        />
+      </div>
+
+      <div>
+        <label>Товари в наборі</label>
+
+        <div
+          style={{
+            marginTop: "8px",
+            border: "1px solid #ddd",
+            borderRadius: "10px",
+            padding: "10px",
+            maxHeight: "250px",
+            overflowY: "auto",
+          }}
+        >
+          {products.map((product) => (
+            <label
+              key={product.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "7px 0",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={promotionProductIds.includes(product.id)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setPromotionProductIds([
+                      ...promotionProductIds,
+                      product.id,
+                    ]);
+                  } else {
+                    setPromotionProductIds(
+                      promotionProductIds.filter(
+                        (id) => id !== product.id
+                      )
+                    );
+                  }
+                }}
+              />
+
+              <span>
+                {product.name} — {product.price} грн
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          paddingTop: "25px",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={promotionActive}
+          onChange={(e) => setPromotionActive(e.target.checked)}
+        />
+
+        <span>Показувати акцію</span>
+      </div>
+    </div>
+
+    <div style={{ marginTop: "18px" }}>
+      <label>Зображення акції</label>
+
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handlePromotionImage}
+        style={{
+          display: "block",
+          marginTop: "8px",
+        }}
+      />
+
+      {promotionImage && (
+        <img
+          src={promotionImage}
+          alt="Попередній перегляд"
+          style={{
+            width: "100%",
+            maxWidth: "500px",
+            height: "220px",
+            objectFit: "cover",
+            borderRadius: "12px",
+            marginTop: "15px",
+            display: "block",
+          }}
+        />
+      )}
+    </div>
+
+    {promotionMessage && (
+      <p
+        style={{
+          marginTop: "15px",
+          fontWeight: 700,
+        }}
+      >
+        {promotionMessage}
+      </p>
+    )}
+
+    <button
+      type="submit"
+      style={{
+        marginTop: "20px",
+        padding: "13px 22px",
+        border: "none",
+        borderRadius: "10px",
+        background: "#657b22",
+        color: "white",
+        cursor: "pointer",
+        fontWeight: 700,
+        fontSize: "16px",
+      }}
+    >
+      {editingPromotionId ? "Зберегти зміни" : "Додати акцію"}
+    </button>
+  </form>
+
+  {promotions.length > 0 && (
+    <div
+      style={{
+        marginTop: "30px",
+        display: "grid",
+        gridTemplateColumns:
+          "repeat(auto-fit, minmax(260px, 1fr))",
+        gap: "15px",
+      }}
+    >
+      {promotions.map((promotion) => (
+        <div
+          key={promotion.id}
+          style={{
+            border: "1px solid #e5e5e5",
+            borderRadius: "14px",
+            overflow: "hidden",
+            background: "#fafafa",
+          }}
+        >
+          {promotion.image && (
+            <img
+              src={promotion.image}
+              alt={promotion.title || "Акція"}
+              style={{
+                width: "100%",
+                height: "170px",
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          )}
+
+          <div style={{ padding: "15px" }}>
+            <h3 style={{ margin: "0 0 8px" }}>
+              {promotion.title || "Без назви"}
+            </h3>
+
+            <p
+              style={{
+                margin: "0 0 12px",
+                color: "#666",
+              }}
+            >
+              {promotion.subtitle || "Без опису"}
+            </p>
+
+            <p
+              style={{
+                margin: "0 0 12px",
+                fontSize: "14px",
+                fontWeight: 700,
+              }}
+            >
+              {promotion.isActive
+                ? "🟢 Активна"
+                : "🔴 Вимкнена"}
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => startEditPromotion(promotion)}
+                style={{
+                  padding: "9px 14px",
+                  border: "none",
+                  borderRadius: "8px",
+                  background: "#333",
+                  color: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                Редагувати
+              </button>
+
+              <button
+                type="button"
+                onClick={() => deletePromotion(promotion.id)}
+                style={{
+                  padding: "9px 14px",
+                  border: "none",
+                  borderRadius: "8px",
+                  background: "#c62828",
+                  color: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                Видалити
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</section>
         {/* ========================= */}
         {/* ТОВАР */}
         {/* ========================= */}
@@ -830,7 +1408,30 @@ export default function AdminPage() {
               </option>
             ))}
           </select>
+<label
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    cursor: "pointer",
+    marginBottom: "12px",
+  }}
+>
+  <input
+    type="checkbox"
+    checked={isBestSeller}
+    onChange={(e) => setIsBestSeller(e.target.checked)}
+    style={{
+      width: "20px",
+      height: "20px",
+      cursor: "pointer",
+    }}
+  />
 
+  <span style={{ fontWeight: "700" }}>
+    🔥 Хіт продажів
+  </span>
+</label>
           <label>
             <b>Фото товару</b>
             <br />
@@ -890,7 +1491,7 @@ export default function AdminPage() {
           </button>
 
           {editingId && (
-            <button
+           <button
               type="button"
               onClick={cancelEdit}
               style={{
@@ -918,7 +1519,117 @@ export default function AdminPage() {
             {message}
           </p>
         )}
+{/* ========================= */}
+{/* КАТЕГОРІЇ */}
+{/* ========================= */}
 
+<h2 style={{ marginTop: 35 }}>
+  Категорії
+</h2>
+
+<div
+  style={{
+    display: "flex",
+    gap: 10,
+    marginBottom: 15,
+    flexWrap: "wrap",
+  }}
+>
+  <input
+    type="text"
+    placeholder="Назва нової категорії"
+    value={newCategoryName}
+    onChange={(e) => setNewCategoryName(e.target.value)}
+    style={{
+      flex: 1,
+      minWidth: 250,
+      padding: 12,
+      border: "1px solid #ddd",
+      borderRadius: 8,
+      fontSize: 16,
+    }}
+  />
+
+<input
+  type="file"
+  accept="image/*"
+  onChange={(e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      setNewCategoryImage(reader.result);
+    };
+
+    reader.readAsDataURL(file);
+  }}
+/>
+  <button
+    type="button"
+    onClick={addCategory}
+    style={{
+      padding: "12px 18px",
+      background: "#111",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      cursor: "pointer",
+      fontWeight: "700",
+    }}
+  >
+    ➕ Додати категорію
+  </button>
+</div>
+
+{categoryMessage && (
+  <p style={{ fontWeight: "700" }}>
+    {categoryMessage}
+  </p>
+)}
+
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    marginBottom: 30,
+  }}
+>
+  {categories.map((category) => (
+    <div
+      key={category.id}
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: 12,
+        border: "1px solid #ddd",
+        borderRadius: 8,
+      }}
+    >
+      <span style={{ fontWeight: "600" }}>
+        {category.name}
+      </span>
+
+      <button
+        type="button"
+        onClick={() => deleteCategory(category.id)}
+        style={{
+          padding: "8px 12px",
+          background: "#e53935",
+          color: "#fff",
+          border: "none",
+          borderRadius: 6,
+          cursor: "pointer",
+        }}
+      >
+        🗑 Видалити
+      </button>
+    </div>
+  ))}
+</div>
         {/* ========================= */}
         {/* ТОВАРИ */}
         {/* ========================= */}

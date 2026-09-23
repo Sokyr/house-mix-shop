@@ -291,7 +291,7 @@ export default function CheckoutPage() {
 
   if (success) {
     return (
-      <main className="page">
+      <main className="hm-checkout-page" className="page">
         <div className="success">
           <div className="check">✓</div>
 
@@ -409,7 +409,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <main className="page">
+    <main className="hm-checkout-page" className="page">
       <div className="container">
         <Link href="/cart" className="back">
           ← Повернутися до кошика
@@ -524,10 +524,7 @@ export default function CheckoutPage() {
                   <option value="Нова пошта">
                     Нова пошта
                   </option>
-                  <option value="Укрпошта">
-                    Укрпошта
-                  </option>
-                  <option value="Самовивіз">
+                                   <option value="Самовивіз">
                     Самовивіз
                   </option>
                 </select>
@@ -609,21 +606,6 @@ export default function CheckoutPage() {
 
               <div className="payments">
                 <h3>Спосіб оплати</h3>
-
-                <label className="radio">
-                  <input
-                    type="radio"
-                    name="payment"
-                    value="Оплата онлайн"
-                    checked={
-                      payment === "Оплата онлайн"
-                    }
-                    onChange={(e) =>
-                      setPayment(e.target.value)
-                    }
-                  />
-                  Оплата онлайн
-                </label>
 
                 <label className="radio">
                   <input
@@ -906,3 +888,4 @@ export default function CheckoutPage() {
     </main>
   );
 }
+

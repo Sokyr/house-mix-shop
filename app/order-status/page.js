@@ -54,7 +54,7 @@ export default function OrderStatusPage() {
     <>
       <Header />
 
-      <main
+      <main className="order-status-page"
         style={{
           minHeight: "calc(100vh - 80px)",
           background: "#f5f5f5",
@@ -177,6 +177,7 @@ export default function OrderStatusPage() {
                           alignItems: "center",
                           gap: "15px",
                           marginBottom: "20px",
+
                         }}
                       >
                         <div

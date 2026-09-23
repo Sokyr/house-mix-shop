@@ -1,0 +1,41 @@
+require("dotenv/config");
+
+const { Pool } = require("pg");
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+async function test() {
+  try {
+    console.time("PRODUCTS SQL");
+
+    const result = await pool.query(`
+      SELECT id, name, price
+      FROM "Product"
+      ORDER BY "createdAt" DESC
+    `);
+
+    console.timeEnd("PRODUCTS SQL");
+    console.log("Products:", result.rows.length);
+
+    console.time("BANNERS SQL");
+
+    const banners = await pool.query(`
+      SELECT id, title, image
+      FROM "HomeBanner"
+      WHERE "isActive" = true
+      ORDER BY "sortOrder" ASC
+    `);
+
+    console.timeEnd("BANNERS SQL");
+    console.log("Banners:", banners.rows.length);
+
+  } catch (error) {
+    console.error("ERROR:", error.message);
+  } finally {
+    await pool.end();
+  }
+}
+
+test();

@@ -14,6 +14,7 @@ export default function CatalogPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const category = params.get("category");
+const bestSellers = params.get("bestSellers") === "1";
 
     if (category) {
       setActiveCategory(Number(category));
@@ -22,22 +23,30 @@ export default function CatalogPage() {
     }
   }, []);
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/products").then((res) => res.json()),
-      fetch("/api/categories").then((res) => res.json()),
-    ])
-      .then(([productsData, categoriesData]) => {
-        setProducts(Array.isArray(productsData) ? productsData : []);
-        setCategories(Array.isArray(categoriesData) ? categoriesData : []);
-        setLoading(false);
-      })
-      .catch(() => {
-        setProducts([]);
-        setCategories([]);
-        setLoading(false);
-      });
-  }, []);
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const bestSellers = params.get("bestSellers") === "1";
+
+  Promise.all([
+    fetch(
+      bestSellers
+        ? "/api/products?bestSellers=1"
+        : "/api/products"
+    ).then((res) => res.json()),
+
+    fetch("/api/categories").then((res) => res.json()),
+  ])
+    .then(([productsData, categoriesData]) => {
+      setProducts(Array.isArray(productsData) ? productsData : []);
+      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      setLoading(false);
+    })
+    .catch(() => {
+      setProducts([]);
+      setCategories([]);
+      setLoading(false);
+    });
+}, []);
 
   const filteredProducts =
     activeCategory === null

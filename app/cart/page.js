@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -57,10 +57,9 @@ export default function CartPage() {
     <>
       <Header />
 
-      <main
-        style={{
+      <main className="hm-cart-main" style={{
           minHeight: "calc(100vh - 80px)",
-          background: "#f5f5f5",
+          background: "url('/cart-background.png') center/cover no-repeat",
           paddingBottom: "50px",
         }}
       >

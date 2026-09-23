@@ -6,6 +6,9 @@ import Link from "next/link";
 export default function HomePage() {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
+const [promotions, setPromotions] = useState([]);
+const [bestSellers, setBestSellers] = useState([]);
+const [activeSlide, setActiveSlide] = useState(0);
 
   const [home, setHome] = useState({
     heroImage: "/house-mix-family.jpg",
@@ -23,6 +26,8 @@ export default function HomePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState("");
+const [searchResults, setSearchResults] = useState([]);
+const [searchLoading, setSearchLoading] = useState(false);
 
   const lastTouchRef = useRef(0);
 
@@ -45,11 +50,11 @@ export default function HomePage() {
     action();
   }
 
-  function toggleSearch() {
-    setSearchOpen((open) => !open);
-    setMenuOpen(false);
-  }
-
+function toggleSearch() {
+ alert("SEARCH BUTTON PRESSED");
+  setSearchOpen((open) => !open);
+  setMenuOpen(false);
+}
   function toggleMenu() {
     setMenuOpen((open) => !open);
     setSearchOpen(false);
@@ -62,60 +67,151 @@ export default function HomePage() {
     }
   }
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [homeRes, categoriesRes, productsRes] =
-          await Promise.all([
-            fetch("/api/home"),
-            fetch("/api/categories"),
-            fetch("/api/products"),
-          ]);
+ useEffect(() => {
 
-        const homeData = await homeRes.json();
-        const categoriesData = await categoriesRes.json();
+  async function loadData() {
+    try {
+      const isMobile = window.innerWidth <= 700;
+
+      const requests = [
+        fetch("/api/home"),
+        fetch("/api/categories"),
+        fetch("/api/products?bestSellers=1"),
+        fetch("/api/promotions"),
+      ];
+
+      if (!isMobile) {
+        requests.push(fetch("/api/products?home=1"));
+      }
+
+      const responses = await Promise.all(requests);
+
+      const homeRes = responses[0];
+      const categoriesRes = responses[1];
+      const bestSellersRes = responses[2];
+      const promotionsRes = responses[3];
+      const productsRes = isMobile ? null : responses[4];
+
+      const homeData = await homeRes.json();
+      const categoriesData = await categoriesRes.json();
+      const bestSellersData = await bestSellersRes.json();
+      const promotionsData = await promotionsRes.json();
+
+      if (Array.isArray(bestSellersData)) {
+        setBestSellers(bestSellersData);
+      }
+
+      if (Array.isArray(promotionsData)) {
+        setPromotions(
+          promotionsData.filter(
+            (promotion) => promotion.isActive
+          )
+        );
+      }
+
+      if (homeData?.settings) {
+        setHome({
+          heroImage:
+            homeData.settings.heroImage ||
+            "/house-mix-family.jpg",
+
+          title:
+            homeData.settings.title ||
+            "Готуйте з любов'ю",
+
+          subtitle:
+            homeData.settings.subtitle ||
+            "Якість у кожній деталі. Надійний посуд для вашої кухні",
+
+          buttonText:
+            homeData.settings.buttonText ||
+            "Переглянути колекцію →",
+
+          buttonLink:
+            homeData.settings.buttonLink ||
+            "/catalog",
+
+          showCategories:
+            homeData.settings.showCategories !== false,
+
+          showPromotions:
+            homeData.settings.showPromotions !== false,
+
+          showBestSellers:
+            homeData.settings.showBestSellers !== false,
+        });
+      }
+
+      if (Array.isArray(categoriesData)) {
+        setCategories(categoriesData);
+      }
+
+      if (productsRes) {
         const productsData = await productsRes.json();
-
-        if (homeData?.settings) {
-          setHome({
-            heroImage:
-              homeData.settings.heroImage ||
-              "/house-mix-family.jpg",
-            title:
-              homeData.settings.title ||
-              "Готуйте з любов'ю",
-            subtitle:
-              homeData.settings.subtitle ||
-              "Якість у кожній деталі. Надійний посуд для вашої кухні",
-            buttonText:
-              homeData.settings.buttonText ||
-              "Переглянути колекцію →",
-            buttonLink:
-              homeData.settings.buttonLink ||
-              "/catalog",
-            showCategories:
-              homeData.settings.showCategories !== false,
-            showPromotions:
-              homeData.settings.showPromotions !== false,
-            showBestSellers:
-              homeData.settings.showBestSellers !== false,
-          });
-        }
-
-        if (Array.isArray(categoriesData)) {
-          setCategories(categoriesData);
-        }
 
         if (Array.isArray(productsData)) {
           setProducts(productsData);
-        }
-      } catch (error) {
-        console.error("HOME ERROR:", error);
-      }
-    }
 
-    loadData();
-  }, []);
+          try {
+            localStorage.setItem(
+              "houseMixProductsCache",
+              JSON.stringify(productsData)
+            );
+          } catch {}
+        }
+      }
+    } catch (error) {
+      console.error("HOME ERROR:", error);
+    }
+  }
+
+  loadData();
+}, []);        
+        
+  function addPromotionToCart(promotion) {
+    try {
+      const cart = JSON.parse(
+        localStorage.getItem("houseMixCart") || "[]"
+      );
+
+      const promoItem = {
+        id: `promo-${promotion.id}`,
+        name: promotion.title || "Акція",
+        price: Number(promotion.promoPrice) || 0,
+        image: promotion.image || "",
+        quantity: 1,
+        isPromotion: true,
+        promotionId: promotion.id,
+        productIds: Array.isArray(promotion.productIds)
+          ? promotion.productIds
+          : JSON.parse(promotion.productIds || "[]"),
+      };
+
+      const existingIndex = cart.findIndex(
+        (item) => item.id === promoItem.id
+      );
+
+      if (existingIndex >= 0) {
+        cart[existingIndex].quantity += 1;
+      } else {
+        cart.push(promoItem);
+      }
+
+      localStorage.setItem(
+        "houseMixCart",
+        JSON.stringify(cart)
+      );
+
+      setCartCount(
+        cart.reduce(
+          (sum, item) => sum + Number(item.quantity || 1),
+          0
+        )
+      );
+    } catch (error) {
+      console.error("PROMOTION CART ERROR:", error);
+    }
+  }
 
   useEffect(() => {
     function updateCart() {
@@ -147,29 +243,68 @@ export default function HomePage() {
     };
   }, []);
 
-  const filteredProducts = useMemo(() => {
-    if (!search.trim()) return products;
+const filteredProducts = useMemo(() => {
+  if (!search.trim()) return [];
 
-    const value = search.toLowerCase();
+  return searchResults;
+}, [searchResults, search]);
 
-    return products.filter((product) =>
-      String(product.name || "")
-        .toLowerCase()
-        .includes(value)
-    );
-  }, [products, search]);
+useEffect(() => {
+  const value = search.trim();
 
-  function getCategoryImage(category) {
-    const product = products.find(
-      (item) =>
-        Number(item.categoryId) === Number(category.id) &&
-        item.image
-    );
-
-    return product?.image || "";
+  if (!value) {
+    setSearchResults([]);
+    setSearchLoading(false);
+    return;
   }
 
-  function categoryTitle(name) {
+  const timer = setTimeout(async () => {
+    try {
+      setSearchLoading(true);
+
+      const response = await fetch(
+        `/api/products?search=${encodeURIComponent(value)}`
+      );
+
+      const data = await response.json();
+
+      setSearchResults(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("SEARCH ERROR:", error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, 300);
+
+  return () => clearTimeout(timer);
+}, [search]);function getCategoryImage(category) {
+  if (category.name === "Посуд") {
+    return "/category-posud.jpg";
+  }
+
+  if (category.name === "Кухонні дрібниці") {
+    return "/category-kitchen.jpg";
+  }
+
+  if (category.name === "Затишок для дому") {
+    return "/category-cozy.jpg";
+  }
+
+  if (category.name === "Організація простору") {
+    return "/category-organization.jpg";
+  }
+if (category.name === "Ванна кімната") {
+  return "/category-bathroom.jpg";
+}
+  const product = products.find(
+    (item) =>
+      Number(item.categoryId) === Number(category.id) &&
+      item.image
+  );
+
+  return product?.image || "";
+}  function categoryTitle(name) {
     if (name === "Посуд") return "Посуд";
 
     if (name === "Організація простору") {
@@ -189,169 +324,157 @@ export default function HomePage() {
 
   return (
     <div className="hm-page">
+     {/* ================= HEADER ================= */}
 
-      {/* ================= HEADER ================= */}
+<header className="hm-header">
 
-      <header className="hm-header">
+  <Link href="/" className="hm-logo">
+    <div>
+      <div className="hm-logo-title">HOUSE MIX</div>
+      <div className="hm-logo-subtitle">
+        ВСЕ ДЛЯ ВАШОГО ДОМУ ♡
+      </div>
+    </div>
+  </Link>
+<div className="hm-header-actions"  style={{      position: "relative",
+      zIndex: 99999,
+      pointerEvents: "auto",
+    }}
+  >
 
-        <Link href="/" className="hm-logo">
-          <div>
-            <div className="hm-logo-title">HOUSE MIX</div>
-            <div className="hm-logo-subtitle">
-              ВСЕ ДЛЯ ВАШОГО ДОМУ ♡
-            </div>
-          </div>
-        </Link>
-
-        <div
-          className="hm-header-actions"
-          style={{
-            position: "relative",
-            zIndex: 99999,
-            pointerEvents: "auto",
-          }}
-        >
-
-
-        
-          {/* ПОШУК */}
+{/* ПОШУК */}
 <button
   type="button"
-  className="hm-header-button"
-  onTouchStart={(e) => runHeaderAction(toggleSearch, e)}
-  onClick={(e) => runHeaderAction(toggleSearch, e)}
+  className="hm-header-button hm-mobile-search-button"
+  onClick={() => {
+    setSearchOpen(true);
+    setMenuOpen(false);
+  }}
   aria-label="Пошук"
 >
   <span className="hm-search-icon" />
 </button>
-          {/* КОШИК */}
 
-          <Link
-            href="/cart"
-            className="hm-header-button"
-            aria-label="Кошик"
-          >
-            <span className="hm-cart-icon">
-              🛒
-            </span>
+    {/* КОШИК */}
+    <Link
+      href="/cart"
+      className="hm-header-button"
+      aria-label="Кошик"
+    >
+      <span className="hm-cart-icon">
+        🛒
+      </span>
 
-            {cartCount > 0 && (
-              <span className="hm-cart-count">
-                {cartCount}
-              </span>
-            )}
-          </Link>
-
-          {/* МЕНЮ */}
-
-         <button
+      {cartCount > 0 && (
+        <span className="hm-cart-count">
+          {cartCount}
+        </span>
+      )}
+    </Link>
+{/* МЕНЮ */}
+<button
   type="button"
   className="hm-header-button"
-  onTouchStart={(e) => runHeaderAction(toggleMenu, e)}
-  onClick={(e) => runHeaderAction(toggleMenu, e)}
-  aria-label="Меню"
+onClick={toggleMenu}
 >
   <span className="hm-menu-icon">
     <span />
     <span />
     <span />
   </span>
-</button>
-        </div>
-        {/* ПОШУК */}
+</button>    
+{/* ВІКНО ПОШУКУ */}
+{searchOpen && (
+  <div
+    className="hm-search-box"
+    style={{
+      position: "absolute",
+      zIndex: 99999,
+      pointerEvents: "auto",
+    }}
+  >
+    <input
+      autoFocus
+      className="hm-search-input"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Пошук товару..."
+    />
+  </div>
+)}
 
-        {searchOpen && (
-          <div
-            className="hm-search-box"
-            style={{
-              position: "absolute",
-              zIndex: 99999,
-              pointerEvents: "auto",
-            }}
-          >
-            <input
-              autoFocus
-              className="hm-search-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Пошук товару..."
-            />
-          </div>
-        )}
+{/* ВІКНО МЕНЮ */}
+    {menuOpen && (
+      <div
+        className="hm-menu"
+        style={{
+          position: "absolute",
+          zIndex: 99999,
+          pointerEvents: "auto",
+        }}
+      >
 
-        {/* МЕНЮ */}
+        <Link
+          href="/"
+          className="hm-menu-link"
+          onClick={() => setMenuOpen(false)}
+        >
+          🏠 <span>Головна</span>
+        </Link>
 
-        {menuOpen && (
-          <div
-            className="hm-menu"
-            style={{
-              position: "absolute",
-              zIndex: 99999,
-              pointerEvents: "auto",
-            }}
-          >
+        <Link
+          href="/catalog"
+          className="hm-menu-link"
+          onClick={() => setMenuOpen(false)}
+        >
+          ▦ <span>Каталог</span>
+        </Link>
 
-            <Link
-              href="/"
-              className="hm-menu-link"
-              onClick={() => setMenuOpen(false)}
-            >
-              🏠 <span>Головна</span>
-            </Link>
+        <Link
+          href="/cart"
+          className="hm-menu-link"
+          onClick={() => setMenuOpen(false)}
+        >
+          🛒 <span>Кошик</span>
+        </Link>
 
-            <Link
-              href="/catalog"
-              className="hm-menu-link"
-              onClick={() => setMenuOpen(false)}
-            >
-              ▦ <span>Каталог</span>
-            </Link>
+        <Link
+          href="/promotions"
+          className="hm-menu-link"
+          onClick={() => setMenuOpen(false)}
+        >
+          ♡ <span>Акції</span>
+        </Link>
 
-            <Link
-              href="/cart"
-              className="hm-menu-link"
-              onClick={() => setMenuOpen(false)}
-            >
-              🛒 <span>Кошик</span>
-            </Link>
+        <Link
+          href="/order-status"
+          className="hm-menu-link"
+          onClick={() => setMenuOpen(false)}
+        >
+          📋 <span>Мої замовлення</span>
+        </Link>
 
-            <Link
-              href="/catalog"
-              className="hm-menu-link"
-              onClick={() => setMenuOpen(false)}
-            >
-              ♡ <span>Акції</span>
-            </Link>
+<Link
+  href="/contact"
+  className="hm-menu-link"
+  onClick={() => setMenuOpen(false)}
+>
+  ☎ <span>Контакти</span>
+</Link>
 
-            <Link
-              href="/order-status"
-              className="hm-menu-link"
-              onClick={() => setMenuOpen(false)}
-            >
-              📋 <span>Мої замовлення</span>
-            </Link>
+      <Link
+  href="/about"
+  className="hm-menu-link"
+  onClick={() => setMenuOpen(false)}
+>
+  ⓘ <span>Про нас</span>
+</Link>
+      </div>
+    )}
 
-            <Link
-              href="/"
-              className="hm-menu-link"
-              onClick={() => setMenuOpen(false)}
-            >
-              ☎ <span>Контакти</span>
-            </Link>
+  </div>
 
-            <Link
-              href="/"
-              className="hm-menu-link"
-              onClick={() => setMenuOpen(false)}
-            >
-              ⓘ <span>Про нас</span>
-            </Link>
-
-          </div>
-        )}
-
-      </header>
-
+</header>
       {/* ================= SEARCH RESULTS ================= */}
 
       {search.trim() ? (
@@ -387,9 +510,7 @@ export default function HomePage() {
             {filteredProducts.length > 0 ? (
               <div className="hm-products">
 
-                {filteredProducts
-                  .slice(0, 8)
-                  .map((product) => (
+{filteredProducts.map((product) => (
                     <Link
                       key={product.id}
                       href={`/catalog/${product.id}`}
@@ -432,62 +553,187 @@ export default function HomePage() {
 
           {/* ================= HERO ================= */}
 
-          <section className="hm-hero">
+<section className="hm-hero">
 
-            <img
-              src={
-                home.heroImage ||
-                "/house-mix-family.jpg"
-              }
-              alt="House Mix"
-              className="hm-hero-image"
-            />
+  {activeSlide === 0 && (
+    <>
+      <img
+        src={home.heroImage || "/house-mix-family.jpg"}
+        alt="House Mix"
+        className="hm-hero-image"
+      />
 
-            <div className="hm-hero-overlay" />
+      <div className="hm-hero-overlay" />
 
-            <div className="hm-hero-content">
+      <div className="hm-hero-content">
+        <div className="hm-container">
+          <div className="hm-hero-text">
 
-              <div className="hm-container">
-
-                <div className="hm-hero-text">
-
-                  <div className="hm-hero-small">
-                    HOUSE MIX • ПОСУД • ДЛЯ ДОМУ • ЗАТИШОК
-                  </div>
-
-                  <h1 className="hm-hero-title">
-                    {home.title}
-                  </h1>
-
-                  <p className="hm-hero-description">
-                    {home.subtitle}
-                  </p>
-
-                  <Link
-                    href={
-                      home.buttonLink ||
-                      "/catalog"
-                    }
-                    className="hm-hero-button"
-                  >
-                    {home.buttonText ||
-                      "Переглянути колекцію →"}
-                  </Link>
-
-                </div>
-
-              </div>
-
+            <div className="hm-hero-small">
+              HOUSE MIX • ПОСУД • ДЛЯ ДОМУ • ЗАТИШОК
             </div>
 
-            <div className="hm-slider-dots">
-              <span className="hm-slider-dot active" />
-              <span className="hm-slider-dot" />
-              <span className="hm-slider-dot" />
+            <h1 className="hm-hero-title">
+              {home.title}
+            </h1>
+
+            <p className="hm-hero-description">
+              {home.subtitle}
+            </p>
+
+            <Link
+              href={home.buttonLink || "/catalog"}
+              className="hm-hero-button"
+            >
+              {home.buttonText || "Переглянути колекцію →"}
+            </Link>
+
+          </div>
+        </div>
+      </div>
+    </>
+  )}
+
+  {activeSlide === 1 && (
+    <>
+      <img
+       src="/house-mix-history.jpg"
+        alt="Історія House Mix"
+        className="hm-hero-image"
+      />
+
+      <div className="hm-hero-overlay" />
+
+      <div className="hm-hero-content">
+        <div className="hm-container">
+        <div
+  className="hm-hero-text"
+  style={{ transform: "translateY(-30px)" }}
+>
+
+            <div className="hm-hero-small">
+              HOUSE MIX • НАША ІСТОРІЯ
             </div>
 
-          </section>
+           <p
+  className="hm-hero-description"
+style={{ fontSize: "16px", lineHeight: "1.45" }}
+>
+            Я гадаю вам не цікаво чути про те, який крутий магазин, як багато товарів у ньому та наскільки в нас все за**ісь. Самостійно побачите і відчуєте це. Я гадаю ви пришли сюди за якоюсь історією про 2 довб*нутих власників цього магазину, тому слухайте!
+Все почалося з того, що один торговий представник просто за**ався працювати на дядю.
+Вставати зранку, їздити по клієнтах, виконувати чужі плани й заробляти комусь гроші. І в один момент подумав:
+«А нах*й воно мені треба? Чому б не зробити щось своє?»
+Ідея була, бажання було — не вистачало тільки напарника.
+І тут, як це часто буває, в один день зустрічаєш старого товариша. Поговорили про життя, про роботу, про те, як усіх уже за**ало працювати на когось.
+І тут він каже:
+«Я теж хочу щось своє мут*ти».
+Ну і все. Зійшлися два таких самих довб*нутих підприємця 😄
+Об’єдналися, почали шукати товар, думати, як усе організувати, і поступово запустили свій магазин.
+Без великих інвесторів, без золотих ложок і без гарантій, що все вийде.
+Просто двоє хлопців, які одного дня сказали:
+«Та пішло воно н*хуй. Будемо робити своє».
+Так і почалася наша історія.
+А далі — тільки більше. 🚀            </p>
 
+          </div>
+        </div>
+      </div>
+    </>
+  )}
+
+  {activeSlide === 2 && (
+    <>
+      <img
+        src="/house-mix-family.jpg"
+        alt="House Mix"
+        className="hm-hero-image"
+      />
+
+      <div className="hm-hero-overlay" />
+
+      <div className="hm-hero-content">
+        <div className="hm-container">
+          <div className="hm-hero-text">
+
+            <div className="hm-hero-small">
+              HOUSE MIX • ДЛЯ ВАШОГО ДОМУ
+            </div>
+
+            <h1 className="hm-hero-title">
+              Затишок починається з деталей
+            </h1>
+
+            <p className="hm-hero-description">
+              Практичні товари для кухні, дому та комфортного
+              повсякденного життя.
+            </p>
+
+          </div>
+        </div>
+      </div>
+    </>
+  )}
+
+  {/* Ліва стрілка */}
+  <button
+    type="button"
+    className="hm-slider-arrow hm-slider-arrow-left"
+onClick={() =>
+  setActiveSlide((slide) =>
+    slide === 0 ? 2 : slide - 1
+  )
+}
+    aria-label="Попередній слайд"
+  >
+    ←
+  </button>
+
+  {/* Права стрілка */}
+  <button
+    type="button"
+    className="hm-slider-arrow hm-slider-arrow-right"
+   onClick={() =>
+  setActiveSlide((slide) =>
+    slide === 2 ? 0 : slide + 1
+  )
+}    aria-label="Наступний слайд"
+  >
+    →
+  </button>
+
+  {/* Крапки */}
+  <div className="hm-slider-dots">
+
+    <button
+      type="button"
+      className={`hm-slider-dot ${
+        activeSlide === 0 ? "active" : ""
+      }`}
+      onClick={() => setActiveSlide(0)}
+      aria-label="Головний слайд"
+    />
+
+    <button
+      type="button"
+      className={`hm-slider-dot ${
+        activeSlide === 1 ? "active" : ""
+      }`}
+      onClick={() => setActiveSlide(1)}
+      aria-label="Історія House Mix"
+    />
+
+    <button
+      type="button"
+      className={`hm-slider-dot ${
+        activeSlide === 2 ? "active" : ""
+      }`}
+      onClick={() => setActiveSlide(2)}
+      aria-label="Третій слайд"
+    />
+
+  </div>
+
+</section>
           {/* ================= BENEFITS ================= */}
 
           <section className="hm-benefits">
@@ -597,7 +843,7 @@ export default function HomePage() {
                     </h2>
 
                     <Link
-                      href="/catalog"
+                    href="/categories"
                       className="hm-section-link"
                     >
                       Всі категорії →
@@ -650,54 +896,22 @@ export default function HomePage() {
               </section>
             )}
 
-          {/* ================= PROMOTION ================= */}
+        {/* ================= PROMOTION ================= */}
 
-          {home.showPromotions && (
-            <section className="hm-promo">
-
-              <img
-                src={
-                  home.heroImage ||
-                  "/house-mix-family.jpg"
-                }
-                alt="Акції"
-                className="hm-promo-image"
-              />
-
-              <div className="hm-promo-content">
-
-                <div className="hm-container">
-
-                  <h2 className="hm-promo-title">
-                    Вигідні
-                    <br />
-                    акції
-                  </h2>
-
-                  <p className="hm-promo-text">
-                    Слідкуй за знижками
-                    <br />
-                    та спеціальними пропозиціями!
-                  </p>
-
-                  <Link
-                    href="/catalog"
-                    className="hm-promo-button"
-                  >
-                    Переглянути акції →
-                  </Link>
-
-                </div>
-
-              </div>
-
-            </section>
-          )}
-
-          {/* ================= BEST SELLERS ================= */}
-
-          {home.showBestSellers &&
-            products.length > 0 && (
+{home.showPromotions && (
+  <section className="hm-promo">
+    <Link href="/promotions" className="hm-promo-link">
+      <img
+       src="/promotions-banner.png"
+        alt="Акції та пропозиції"
+        className="hm-promo-image"
+      />
+    </Link>
+  </section>
+)}
+{/* ================= BEST SELLERS ================= */}
+         {home.showBestSellers &&
+  bestSellers.length > 0 && (
               <section className="hm-section">
 
                 <div className="hm-container">
@@ -708,20 +922,19 @@ export default function HomePage() {
                       Хіти продажів
                     </h2>
 
-                    <Link
-                      href="/catalog"
-                      className="hm-section-link"
-                    >
-                      Дивитись всі →
+                  <Link
+    href="/catalog?bestSellers=1"
+  className="hm-section-link"
+ 
+>                      Дивитись всі →
                     </Link>
 
                   </div>
 
                   <div className="hm-products">
 
-                    {products
-                      .slice(0, 8)
-                      .map((product) => (
+             
+  {bestSellers.map((product) => (
                         <Link
                           key={product.id}
                           href={`/catalog/${product.id}`}
@@ -820,15 +1033,14 @@ export default function HomePage() {
 
                   <h3>Інформація</h3>
 
+<Link
+  href="/about"
+  className="hm-footer-link"
+>
+  Про нас
+</Link>
                   <Link
-                    href="/"
-                    className="hm-footer-link"
-                  >
-                    Про нас
-                  </Link>
-
-                  <Link
-                    href="/"
+                  href="/contact"
                     className="hm-footer-link"
                   >
                     Контакти
@@ -848,3 +1060,4 @@ export default function HomePage() {
     </div>
   );
 }
+
