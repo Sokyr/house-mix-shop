@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -28,13 +28,12 @@ export default function CatalogPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const bestSellers = params.get("bestSellers") === "1";
-    const category = params.get("category");
 
     Promise.all([
       fetch(
         bestSellers
-          ? `/api/products?bestSellers=1&page=1&limit=20${category ? `&category=${category}` : ""}`
-          : `/api/products?page=1&limit=20${category ? `&category=${category}` : ""}`
+          ? "/api/products?bestSellers=1&page=1&limit=20"
+          : "/api/products?page=1&limit=20"
       ).then((res) => res.json()),
 
       fetch("/api/categories").then((res) => res.json()),
@@ -62,14 +61,13 @@ export default function CatalogPage() {
     const nextPage = page + 1;
     const params = new URLSearchParams(window.location.search);
     const bestSellers = params.get("bestSellers") === "1";
-    const category = params.get("category");
 
     setLoadingMore(true);
 
     try {
       const url = bestSellers
-        ? `/api/products?bestSellers=1&page=${nextPage}&limit=20${category ? `&category=${category}` : ""}`
-        : `/api/products?page=${nextPage}&limit=20${category ? `&category=${category}` : ""}`;
+        ? `/api/products?bestSellers=1&page=${nextPage}&limit=20`
+        : `/api/products?page=${nextPage}&limit=20`;
 
       const res = await fetch(url);
       const data = await res.json();
@@ -159,29 +157,12 @@ export default function CatalogPage() {
                   key={category.id}
                   onClick={() => {
                     setActiveCategory(category.id);
-                    setLoading(true);
-                    setPage(1);
-                    setHasMore(true);
-
-                    fetch(`/api/products?category=${category.id}&page=1&limit=20`)
-                      .then((res) => res.json())
-                      .then((data) => {
-                        const list = Array.isArray(data) ? data : [];
-                        setProducts(list);
-                        setHasMore(list.length === 20);
-                        setLoading(false);
-                      })
-                      .catch(() => {
-                        setProducts([]);
-                        setHasMore(false);
-                        setLoading(false);
-                      });
-
                     window.history.replaceState(
                       {},
                       "",
                       `/catalog?category=${category.id}`
-                    );}}
+                    );
+                  }}
                   style={{
                     padding: "12px 20px",
                     borderRadius: "25px",
@@ -286,7 +267,7 @@ export default function CatalogPage() {
 
           {!loading && filteredProducts.length === 0 && (
             <div style={{ padding: "40px 0", textAlign: "center" }}>
-              РўРѕРІР°СЂС–РІ РЅРµ Р·РЅР°Р№РґРµРЅРѕ
+              Товарів не знайдено
             </div>
           )}
 
@@ -321,7 +302,3 @@ export default function CatalogPage() {
     </>
   );
 }
-
-
-
-
